@@ -1,7 +1,7 @@
 import json
 import os
 
-from primitive_db.constants import DATA_DIR
+from primitive_db.constants import DATA_DIR, TABLE_FILE_SUFFIX
 
 
 def load_metadata(filepath):
@@ -21,7 +21,7 @@ def save_metadata(filepath, data):
 
 def _table_path(table_name):
     """Путь к файлу данных таблицы."""
-    return os.path.join(DATA_DIR, f"{table_name}.json")
+    return os.path.join(DATA_DIR, f"{table_name}{TABLE_FILE_SUFFIX}")
 
 
 def load_table_data(table_name):

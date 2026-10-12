@@ -1,5 +1,6 @@
 META_FILE = "db_meta.json"
 DATA_DIR = "data"
+TABLE_FILE_SUFFIX = ".json"
 
 ID_COLUMN = "ID"
 ID_TYPE = "int"
