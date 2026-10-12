@@ -1,9 +1,10 @@
 # primitive_db
 
-TUI приложение для работы с примитивной базой данных, доступные типы (int, str, bool). Реализованы CRUD операции
-и хранение метаданных в JSON.
+Консольная база данных с командами для создания таблиц и добавления, чтения,
+обновления и удаления записей. Поддерживает типы `int`, `str`, `bool`.
+Метаданные и записи сохраняются в JSON между запусками.
 
-## Demo asciinema
+## Демонстрация
 
 [![asciicast](https://asciinema.org/a/JFkFkfN1YEvgONZs.svg)](https://asciinema.org/a/JFkFkfN1YEvgONZs)
 
@@ -88,7 +89,7 @@ database
 Реализовано в [decorators.py](src/primitive_db/decorators.py):
 
 - `handle_db_errors` — централизованная обработка ошибок (`FileNotFoundError`,
-  `KeyError`, `ValueError`) во всех функциях `core.py`; вместо traceback
+  `KeyError`, `ValueError`) в операциях `core.py`; вместо traceback
   выводится сообщение `Ошибка: ...`.
 - `confirm_action` — перед `drop_table` и `delete` запрашивается подтверждение:
 

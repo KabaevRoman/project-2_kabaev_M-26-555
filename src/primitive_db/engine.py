@@ -24,7 +24,7 @@ from primitive_db.utils import (
 
 
 def print_help():
-    """Prints the help message for the current mode."""
+    """Выводит список команд и их синтаксис."""
 
     print("\n***Операции с данными***")
     print("Функции:")
