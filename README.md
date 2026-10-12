@@ -4,6 +4,10 @@
 таблицы с типизированными столбцами (`int`, `str`, `bool`), CRUD-операции,
 хранение метаданных и данных в JSON.
 
+## Демонстрация
+
+[![asciicast](https://asciinema.org/a/JFkFkfN1YEvgONZs.svg)](https://asciinema.org/a/JFkFkfN1YEvgONZs)
+
 ## Установка и запуск
 
 Требуется [uv](https://docs.astral.sh/uv/).
