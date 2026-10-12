@@ -1,10 +1,9 @@
 # primitive_db
 
-Консольное приложение, имитирующее работу с примитивной базой данных:
-таблицы с типизированными столбцами (`int`, `str`, `bool`), CRUD-операции,
-хранение метаданных и данных в JSON.
+TUI приложение для работы с примитивной базой данных, доступные типы (int, str, bool). Реализованы CRUD операции
+и хранение метаданных в JSON.
 
-## Демонстрация
+## Demo asciinema
 
 [![asciicast](https://asciinema.org/a/JFkFkfN1YEvgONZs.svg)](https://asciinema.org/a/JFkFkfN1YEvgONZs)
 
