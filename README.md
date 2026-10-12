@@ -65,3 +65,24 @@ uv run project
 Столбцы: ID:int, name:str, age:int, is_active:bool
 Количество записей: 0
 ```
+
+## Обработка ошибок, подтверждения и кэш
+
+Реализовано в [decorators.py](src/primitive_db/decorators.py):
+
+- `handle_db_errors` — централизованная обработка ошибок (`FileNotFoundError`,
+  `KeyError`, `ValueError`) во всех функциях `core.py`; вместо traceback
+  выводится сообщение `Ошибка: ...`.
+- `confirm_action` — перед `drop_table` и `delete` запрашивается подтверждение:
+
+  ```
+  >>>Введите команду: drop_table users
+  Вы уверены, что хотите выполнить "удаление таблицы"? [y/n]: n
+  Операция отменена.
+  ```
+
+- `log_time` — для `select` и `insert` выводится время выполнения:
+  `Функция select выполнилась за 0.001 секунд.`
+- `create_cacher` — замыкание-кэш для `select`: одинаковые запросы
+  повторно не выполняются; кэш сбрасывается после `insert`, `update`,
+  `delete` и `drop_table`.

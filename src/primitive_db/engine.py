@@ -5,6 +5,7 @@ import prompt
 from prettytable import PrettyTable
 
 from primitive_db import core
+from primitive_db.decorators import create_cacher
 from primitive_db.parser import ParseError, parse_clause, parse_values
 from primitive_db.utils import (
     delete_table_data,
@@ -79,64 +80,72 @@ def format_ids(records):
     return ", ".join(str(r["ID"]) for r in records)
 
 
-def handle_data_command(user_input, metadata):
+def handle_data_command(user_input, metadata, cache_result):
     """Обрабатывает CRUD-команды. Возвращает False, если команда не распознана."""
     if m := INSERT_RE.match(user_input):
         table_name = m.group(1)
-        core.get_columns(metadata, table_name)
         data = load_table_data(table_name)
         data = core.insert(metadata, table_name, parse_values(m.group(2)), data)
-        save_table_data(table_name, data)
-        print(
-            f'Запись с ID={data[-1]["ID"]} успешно добавлена '
-            f'в таблицу "{table_name}".'
-        )
+        if data is not None:
+            save_table_data(table_name, data)
+            cache_result.clear()
+            print(
+                f'Запись с ID={data[-1]["ID"]} успешно добавлена '
+                f'в таблицу "{table_name}".'
+            )
     elif m := SELECT_RE.match(user_input):
         table_name = m.group(1)
-        core.get_columns(metadata, table_name)
-        where = parse_clause(m.group(2)) if m.group(2) else None
-        if where:
-            core.validate_clause(metadata, table_name, where)
-        data = load_table_data(table_name)
-        print_table(metadata, table_name, core.select(data, where))
+        where = parse_clause(m.group(2)) if m.group(2) else {}
+        if core.validate_clause(metadata, table_name, where):
+            key = (table_name, tuple(sorted(where.items())))
+            records = cache_result(
+                key,
+                lambda: core.select(load_table_data(table_name), where),
+            )
+            if records is not None:
+                print_table(metadata, table_name, records)
     elif m := UPDATE_RE.match(user_input):
         table_name = m.group(1)
         set_clause, where = parse_clause(m.group(2)), parse_clause(m.group(3))
-        core.validate_clause(metadata, table_name, set_clause)
-        core.validate_clause(metadata, table_name, where)
-        if "ID" in set_clause:
-            raise ValueError("Столбец ID изменять нельзя.")
-        data = load_table_data(table_name)
-        found = core.select(data, where)
-        if not found:
-            raise ValueError("Записи по условию не найдены.")
-        ids = format_ids(found)
-        save_table_data(table_name, core.update(data, set_clause, where))
-        print(f'Запись с ID={ids} в таблице "{table_name}" успешно обновлена.')
+        if core.validate_clause(
+            metadata, table_name, set_clause
+        ) and core.validate_clause(metadata, table_name, where):
+            data = load_table_data(table_name)
+            ids = format_ids(core.find_records(data, where))
+            data = core.update(data, set_clause, where)
+            if data is not None:
+                save_table_data(table_name, data)
+                cache_result.clear()
+                print(
+                    f'Запись с ID={ids} в таблице "{table_name}" '
+                    "успешно обновлена."
+                )
     elif m := DELETE_RE.match(user_input):
         table_name = m.group(1)
         where = parse_clause(m.group(2))
-        core.validate_clause(metadata, table_name, where)
-        data = load_table_data(table_name)
-        found = core.select(data, where)
-        if not found:
-            raise ValueError("Записи по условию не найдены.")
-        ids = format_ids(found)
-        save_table_data(table_name, core.delete(data, where))
-        print(f'Запись с ID={ids} успешно удалена из таблицы "{table_name}".')
+        if core.validate_clause(metadata, table_name, where):
+            data = load_table_data(table_name)
+            ids = format_ids(core.find_records(data, where))
+            data = core.delete(data, where)
+            if data is not None:
+                save_table_data(table_name, data)
+                cache_result.clear()
+                print(f'Запись с ID={ids} успешно удалена из таблицы "{table_name}".')
     elif m := INFO_RE.match(user_input):
         table_name = m.group(1)
-        columns = core.get_columns(metadata, table_name)
-        cols = ", ".join(f"{n}:{t}" for n, t in columns.items())
-        print(f"Таблица: {table_name}")
-        print(f"Столбцы: {cols}")
-        print(f"Количество записей: {len(load_table_data(table_name))}")
+        info = core.table_info(metadata, table_name, load_table_data(table_name))
+        if info is not None:
+            cols, count = info
+            print(f"Таблица: {table_name}")
+            print(f"Столбцы: {cols}")
+            print(f"Количество записей: {count}")
     else:
         return False
     return True
 
 
 def run():
+    cache_result = create_cacher()
     print_help()
 
     while True:
@@ -146,13 +155,12 @@ def run():
             continue
 
         try:
-            if handle_data_command(user_input, metadata):
+            if handle_data_command(
+                user_input, metadata, cache_result
+            ):
                 continue
         except ParseError as e:
             print(f"Некорректное значение: {e}. Попробуйте снова.")
-            continue
-        except ValueError as e:
-            print(f"Ошибка: {e}")
             continue
 
         try:
@@ -176,16 +184,17 @@ def run():
                 columns = parse_columns(args[2:])
                 if columns is None:
                     continue
-                save_metadata(
-                    META_FILE, core.create_table(metadata, args[1], columns)
-                )
+                new_meta = core.create_table(metadata, args[1], columns)
+                if new_meta is not None:
+                    save_metadata(META_FILE, new_meta)
             case "drop_table":
                 if len(args) != 2:
                     print(f"Некорректное значение: {user_input}. Попробуйте снова.")
                     continue
-                existed = args[1] in metadata
-                save_metadata(META_FILE, core.drop_table(metadata, args[1]))
-                if existed:
+                new_meta = core.drop_table(metadata, args[1])
+                if new_meta is not None:
+                    save_metadata(META_FILE, new_meta)
                     delete_table_data(args[1])
+                    cache_result.clear()
             case _:
                 print(f"Функции {command} нет. Попробуйте снова.")
