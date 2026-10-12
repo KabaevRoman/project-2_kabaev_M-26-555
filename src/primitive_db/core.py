@@ -1,6 +1,5 @@
+from primitive_db.constants import ID_COLUMN, ID_TYPE, VALID_TYPES
 from primitive_db.decorators import confirm_action, handle_db_errors, log_time
-
-VALID_TYPES = ("int", "str", "bool")
 
 TYPE_CHECKS = {
     "int": lambda v: isinstance(v, int) and not isinstance(v, bool),
@@ -10,6 +9,7 @@ TYPE_CHECKS = {
 
 
 def get_columns(metadata, table_name):
+    """Возвращает словарь {столбец: тип}; ValueError, если таблицы нет."""
     if table_name not in metadata:
         raise ValueError(f'Таблица "{table_name}" не существует.')
     return {c["name"]: c["type"] for c in metadata[table_name]["columns"]}
@@ -40,7 +40,7 @@ def create_table(metadata, table_name, columns):
             raise ValueError(f"Неподдерживаемый тип {name}:{col_type}.")
 
     metadata[table_name] = {
-        "columns": [{"name": "ID", "type": "int"}]
+        "columns": [{"name": ID_COLUMN, "type": ID_TYPE}]
         + [{"name": n, "type": t} for n, t in columns]
     }
     all_columns = metadata[table_name]["columns"]
@@ -52,6 +52,7 @@ def create_table(metadata, table_name, columns):
 @handle_db_errors
 @confirm_action("удаление таблицы")
 def drop_table(metadata, table_name):
+    """Удаляет таблицу из метаданных."""
     if table_name not in metadata:
         raise ValueError(f'Таблица "{table_name}" не существует.')
 
@@ -61,6 +62,7 @@ def drop_table(metadata, table_name):
 
 
 def list_tables(metadata):
+    """Печатает имена всех таблиц."""
     if not metadata:
         print("Таблиц нет.")
     for name in metadata:
@@ -68,6 +70,7 @@ def list_tables(metadata):
 
 
 def validate_clause_types(columns, record):
+    """Проверяет, что типы значений соответствуют схеме столбцов."""
     for name, value in record.items():
         if not TYPE_CHECKS[columns[name]](value):
             raise ValueError(
@@ -89,6 +92,7 @@ def validate_clause(metadata, table_name, clause):
 
 @handle_db_errors
 def table_info(metadata, table_name, table_data):
+    """Возвращает (строка столбцов, число записей)."""
     columns = get_columns(metadata, table_name)
     cols = ", ".join(f"{n}:{t}" for n, t in columns.items())
     return cols, len(table_data)
@@ -97,8 +101,9 @@ def table_info(metadata, table_name, table_data):
 @handle_db_errors
 @log_time
 def insert(metadata, table_name, values, table_data):
+    """Добавляет запись с автоматическим ID и возвращает данные таблицы."""
     columns = get_columns(metadata, table_name)
-    names = [n for n in columns if n != "ID"]
+    names = [n for n in columns if n != ID_COLUMN]
     if len(values) != len(names):
         raise ValueError(
             f"Ожидается значений: {len(names)}, передано: {len(values)}."
@@ -107,20 +112,22 @@ def insert(metadata, table_name, values, table_data):
     record = dict(zip(names, values))
     validate_clause_types(columns, record)
 
-    new_id = max((r["ID"] for r in table_data), default=0) + 1
-    table_data.append({"ID": new_id, **record})
+    new_id = max((r[ID_COLUMN] for r in table_data), default=0) + 1
+    table_data.append({ID_COLUMN: new_id, **record})
     return table_data
 
 
 @handle_db_errors
 @log_time
 def select(table_data, where_clause=None):
+    """Возвращает записи, подходящие под условие (или все)."""
     return find_records(table_data, where_clause)
 
 
 @handle_db_errors
 def update(table_data, set_clause, where_clause):
-    if "ID" in set_clause:
+    """Обновляет поля найденных записей и возвращает данные таблицы."""
+    if ID_COLUMN in set_clause:
         raise ValueError("Столбец ID изменять нельзя.")
     found = find_records(table_data, where_clause)
     if not found:
@@ -133,6 +140,7 @@ def update(table_data, set_clause, where_clause):
 @handle_db_errors
 @confirm_action("удаление записи")
 def delete(table_data, where_clause):
+    """Удаляет найденные записи и возвращает данные таблицы."""
     found = find_records(table_data, where_clause)
     if not found:
         raise ValueError("Записи по условию не найдены.")

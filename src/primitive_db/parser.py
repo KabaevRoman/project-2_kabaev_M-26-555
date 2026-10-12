@@ -44,6 +44,7 @@ def parse_value(token):
 
 
 def parse_values(text):
+    """Разбирает список значений 'a, "b", 3' в список Python-значений."""
     return [parse_value(t) for t in split_outside_quotes(text)]
 
 

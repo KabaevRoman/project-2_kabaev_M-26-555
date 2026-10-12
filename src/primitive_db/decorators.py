@@ -3,6 +3,8 @@ import time
 
 import prompt
 
+from primitive_db.constants import CONFIRM_YES
+
 
 def handle_db_errors(func):
     """Перехватывает типовые ошибки БД и печатает понятное сообщение."""
@@ -35,7 +37,7 @@ def confirm_action(action_name):
             answer = prompt.string(
                 f'Вы уверены, что хотите выполнить "{action_name}"? [y/n]: '
             )
-            if answer.strip().lower() != "y":
+            if answer.strip().lower() != CONFIRM_YES:
                 print("Операция отменена.")
                 return None
             return func(*args, **kwargs)
@@ -65,6 +67,7 @@ def create_cacher():
     cache = {}
 
     def cache_result(key, value_func):
+        """Возвращает значение из кэша или вычисляет его через value_func."""
         if key not in cache:
             cache[key] = value_func()
         return cache[key]

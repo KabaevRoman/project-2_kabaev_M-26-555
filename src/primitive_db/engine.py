@@ -5,6 +5,7 @@ import prompt
 from prettytable import PrettyTable
 
 from primitive_db import core
+from primitive_db.constants import COMMAND_PROMPT, ID_COLUMN, META_FILE
 from primitive_db.decorators import create_cacher
 from primitive_db.parser import ParseError, parse_clause, parse_values
 from primitive_db.utils import (
@@ -14,8 +15,6 @@ from primitive_db.utils import (
     save_metadata,
     save_table_data,
 )
-
-META_FILE = "db_meta.json"
 
 INSERT_RE = re.compile(
     r"^insert\s+into\s+(\w+)\s+values\s*\((.*)\)\s*$", re.IGNORECASE
@@ -66,6 +65,7 @@ def parse_columns(specs):
 
 
 def print_table(metadata, table_name, records):
+    """Печатает записи таблицей PrettyTable."""
     if not records:
         print("Записей не найдено.")
         return
@@ -77,7 +77,8 @@ def print_table(metadata, table_name, records):
 
 
 def format_ids(records):
-    return ", ".join(str(r["ID"]) for r in records)
+    """Строка с ID записей через запятую."""
+    return ", ".join(str(r[ID_COLUMN]) for r in records)
 
 
 def handle_data_command(user_input, metadata, cache_result):
@@ -90,7 +91,7 @@ def handle_data_command(user_input, metadata, cache_result):
             save_table_data(table_name, data)
             cache_result.clear()
             print(
-                f'Запись с ID={data[-1]["ID"]} успешно добавлена '
+                f'Запись с ID={data[-1][ID_COLUMN]} успешно добавлена '
                 f'в таблицу "{table_name}".'
             )
     elif m := SELECT_RE.match(user_input):
@@ -145,12 +146,13 @@ def handle_data_command(user_input, metadata, cache_result):
 
 
 def run():
+    """Главный цикл: чтение команд и вызов соответствующих операций."""
     cache_result = create_cacher()
     print_help()
 
     while True:
         metadata = load_metadata(META_FILE)
-        user_input = prompt.string(">>>Введите команду: ").strip()
+        user_input = prompt.string(COMMAND_PROMPT).strip()
         if not user_input:
             continue
 

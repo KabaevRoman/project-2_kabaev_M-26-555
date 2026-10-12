@@ -3,6 +3,7 @@ from primitive_db.engine import run
 
 
 def main() -> None:
+    """Точка входа."""
     run()
 
 
