@@ -1,4 +1,3 @@
-import functools
 import time
 
 import prompt
@@ -9,7 +8,6 @@ from primitive_db.constants import CONFIRM_YES
 def handle_db_errors(func):
     """Перехватывает типовые ошибки БД и печатает понятное сообщение."""
 
-    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         try:
             return func(*args, **kwargs)
@@ -32,7 +30,6 @@ def confirm_action(action_name):
     """Фабрика декораторов: запрашивает подтверждение перед операцией."""
 
     def decorator(func):
-        @functools.wraps(func)
         def wrapper(*args, **kwargs):
             answer = prompt.string(
                 f'Вы уверены, что хотите выполнить "{action_name}"? [y/n]: '
@@ -50,7 +47,6 @@ def confirm_action(action_name):
 def log_time(func):
     """Печатает время выполнения функции."""
 
-    @functools.wraps(func)
     def wrapper(*args, **kwargs):
         start = time.monotonic()
         try:

@@ -1,4 +1,3 @@
-import re
 import shlex
 
 import prompt
@@ -7,7 +6,14 @@ from prettytable import PrettyTable
 from primitive_db import core
 from primitive_db.constants import COMMAND_PROMPT, ID_COLUMN, META_FILE
 from primitive_db.decorators import create_cacher
-from primitive_db.parser import ParseError, parse_clause, parse_values
+from primitive_db.parser import (
+    parse_clause,
+    parse_delete,
+    parse_info,
+    parse_insert,
+    parse_select,
+    parse_update,
+)
 from primitive_db.utils import (
     delete_table_data,
     load_metadata,
@@ -15,18 +21,6 @@ from primitive_db.utils import (
     save_metadata,
     save_table_data,
 )
-
-INSERT_RE = re.compile(
-    r"^insert\s+into\s+(\w+)\s+values\s*\((.*)\)\s*$", re.IGNORECASE
-)
-SELECT_RE = re.compile(
-    r"^select\s+from\s+(\w+)(?:\s+where\s+(.+))?\s*$", re.IGNORECASE
-)
-UPDATE_RE = re.compile(
-    r"^update\s+(\w+)\s+set\s+(.+?)\s+where\s+(.+)$", re.IGNORECASE
-)
-DELETE_RE = re.compile(r"^delete\s+from\s+(\w+)\s+where\s+(.+)$", re.IGNORECASE)
-INFO_RE = re.compile(r"^info\s+(\w+)\s*$", re.IGNORECASE)
 
 
 def print_help():
@@ -82,11 +76,15 @@ def format_ids(records):
 
 
 def handle_data_command(user_input, metadata, cache_result):
-    """Обрабатывает CRUD-команды. Возвращает False, если команда не распознана."""
-    if m := INSERT_RE.match(user_input):
-        table_name = m.group(1)
+    """Обрабатывает CRUD-команды. Возвращает False, если команда не распознана.
+
+    Некорректный синтаксис команды приводит к ValueError.
+    """
+    command = user_input.split(None, 1)[0].lower()
+    if command == "insert":
+        table_name, values = parse_insert(user_input)
         data = load_table_data(table_name)
-        data = core.insert(metadata, table_name, parse_values(m.group(2)), data)
+        data = core.insert(metadata, table_name, values, data)
         if data is not None:
             save_table_data(table_name, data)
             cache_result.clear()
@@ -94,9 +92,9 @@ def handle_data_command(user_input, metadata, cache_result):
                 f'Запись с ID={data[-1][ID_COLUMN]} успешно добавлена '
                 f'в таблицу "{table_name}".'
             )
-    elif m := SELECT_RE.match(user_input):
-        table_name = m.group(1)
-        where = parse_clause(m.group(2)) if m.group(2) else {}
+    elif command == "select":
+        table_name, where_text = parse_select(user_input)
+        where = parse_clause(where_text) if where_text else {}
         if core.validate_clause(metadata, table_name, where):
             key = (table_name, tuple(sorted(where.items())))
             records = cache_result(
@@ -105,9 +103,9 @@ def handle_data_command(user_input, metadata, cache_result):
             )
             if records is not None:
                 print_table(metadata, table_name, records)
-    elif m := UPDATE_RE.match(user_input):
-        table_name = m.group(1)
-        set_clause, where = parse_clause(m.group(2)), parse_clause(m.group(3))
+    elif command == "update":
+        table_name, set_text, where_text = parse_update(user_input)
+        set_clause, where = parse_clause(set_text), parse_clause(where_text)
         if core.validate_clause(
             metadata, table_name, set_clause
         ) and core.validate_clause(metadata, table_name, where):
@@ -121,9 +119,9 @@ def handle_data_command(user_input, metadata, cache_result):
                     f'Запись с ID={ids} в таблице "{table_name}" '
                     "успешно обновлена."
                 )
-    elif m := DELETE_RE.match(user_input):
-        table_name = m.group(1)
-        where = parse_clause(m.group(2))
+    elif command == "delete":
+        table_name, where_text = parse_delete(user_input)
+        where = parse_clause(where_text)
         if core.validate_clause(metadata, table_name, where):
             data = load_table_data(table_name)
             ids = format_ids(core.find_records(data, where))
@@ -132,8 +130,8 @@ def handle_data_command(user_input, metadata, cache_result):
                 save_table_data(table_name, data)
                 cache_result.clear()
                 print(f'Запись с ID={ids} успешно удалена из таблицы "{table_name}".')
-    elif m := INFO_RE.match(user_input):
-        table_name = m.group(1)
+    elif command == "info":
+        table_name = parse_info(user_input)
         info = core.table_info(metadata, table_name, load_table_data(table_name))
         if info is not None:
             cols, count = info
@@ -161,7 +159,7 @@ def run():
                 user_input, metadata, cache_result
             ):
                 continue
-        except ParseError as e:
+        except ValueError as e:
             print(f"Некорректное значение: {e}. Попробуйте снова.")
             continue
 
